@@ -10,7 +10,7 @@ stock = {
     "savon": {"prix": 1500, "quantite": 0},
 }
 
-# 1. Afficher chaque produit
+# 1. Afficher chaque produit avec son prix et sa quantité
 for produit, informations in stock.items():
     print(
         produit,
@@ -26,7 +26,7 @@ for informations in stock.values():
 
 print("Valeur totale :", valeur_totale, "Ar")
 
-# 3. Produits en rupture
+# 3. Produits en rupture de stock (par compréhension)
 ruptures = [
     produit
     for produit, informations in stock.items()
@@ -35,12 +35,16 @@ ruptures = [
 
 print("Produits en rupture :", ruptures)
 
-# 4. Vendre
+# 4. Vendre un produit
 def vendre(stock, produit, quantite):
+    """Vend une quantité d'un produit. Renvoie le tuple (succes, message)."""
     informations = stock.get(produit)
 
     if informations is None:
         return False, "Produit inconnu"
+
+    if quantite <= 0:
+        return False, "La quantité doit être positive"
 
     if informations["quantite"] < quantite:
         return False, "Quantité insuffisante"
@@ -51,9 +55,11 @@ def vendre(stock, produit, quantite):
 print(vendre(stock, "riz", 5))
 print(vendre(stock, "cafe", 2))
 print(vendre(stock, "huile", 100))
+print(vendre(stock, "sucre", -3))
 
-# 5. Ajouter un produit
+# 5. Ajouter un produit (refusé s'il existe déjà)
 def ajouter_produit(stock, nom, prix, quantite):
+    """Ajoute un produit absent du stock. Renvoie le tuple (succes, message)."""
     if nom in stock:
         return False, "Produit déjà présent"
 
@@ -67,7 +73,7 @@ def ajouter_produit(stock, nom, prix, quantite):
 print(ajouter_produit(stock, "sel", 1000, 20))
 print(ajouter_produit(stock, "riz", 3500, 10))
 
-# 6. Prix augmentés de 10 %
+# 6. Prix augmentés de 10 %, arrondis à l'ariary (compréhension de dictionnaire)
 prix_hausse = {
     produit: round(informations["prix"] * 1.10)
     for produit, informations in stock.items()
@@ -75,7 +81,7 @@ prix_hausse = {
 
 print("Prix après hausse :", prix_hausse)
 
-# 7. Compter les ventes avec get
+# 7. Compter les ventes : d'abord avec get, puis avec Counter
 ventes = ["riz", "sucre", "riz", "huile", "riz"]
 
 compteur = {}
@@ -84,11 +90,9 @@ for produit in ventes:
     compteur[produit] = compteur.get(produit, 0) + 1
 
 print("Avec get :", compteur)
-
-# Avec Counter
 print("Avec Counter :", dict(Counter(ventes)))
 
-# 8. Sauvegarder puis recharger en JSON
+# 8. Sauvegarder dans stock.json, recharger et comparer
 with open("stock.json", "w", encoding="utf-8") as fichier:
     json.dump(stock, fichier, ensure_ascii=False, indent=2)
 
