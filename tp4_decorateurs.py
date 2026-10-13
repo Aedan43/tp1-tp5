@@ -1,10 +1,10 @@
 # TP 4 — Atelier décorateurs
 
-from functools import wraps, lru_cache
 import time
+from functools import wraps, lru_cache
 
-# 1. @chronometrer
-def chronometrer_secondes(fonction):
+# 1. @chronometrer : affiche le temps d'exécution
+def chronometrer(fonction):
     @wraps(fonction)
     def enveloppe(*args, **kwargs):
         debut = time.perf_counter()
@@ -16,13 +16,13 @@ def chronometrer_secondes(fonction):
 
     return enveloppe
 
-@chronometrer_secondes
+@chronometrer
 def lente():
     time.sleep(1)
 
 lente()
 
-# 2. @majuscules
+# 2. @majuscules : met en majuscules le texte renvoyé
 def majuscules(fonction):
     @wraps(fonction)
     def enveloppe(*args, **kwargs):
@@ -37,7 +37,7 @@ def bonjour():
 
 print(bonjour())
 
-# 3. @compter_appels
+# 3. @compter_appels : compte les appels dans l'attribut appels
 def compter_appels(fonction):
     @wraps(fonction)
     def enveloppe(*args, **kwargs):
@@ -56,7 +56,7 @@ print(saluer("Rabe"))
 print(saluer("Andry"))
 print("Nombre d'appels :", saluer.appels)
 
-# 4. @verifier_positifs
+# 4. @verifier_positifs : refuse les arguments numériques négatifs
 def verifier_positifs(fonction):
     @wraps(fonction)
     def enveloppe(*args, **kwargs):
@@ -83,7 +83,9 @@ try:
 except ValueError as erreur:
     print(erreur)
 
-# 5. @chronometrer(unite="ms")
+# 5. @chronometrer(unite="ms") : le décorateur de la question 1 avec un paramètre
+# À partir d'ici, chronometrer prend un paramètre : on l'écrit
+# @chronometrer() (secondes) ou @chronometrer(unite="ms") (millisecondes).
 def chronometrer(unite="s"):
     def decorateur(fonction):
         @wraps(fonction)
@@ -111,7 +113,7 @@ def attente():
 
 attente()
 
-# 6. @memoriser
+# 6. @memoriser : mémorise les résultats, avec les arguments (un tuple) comme clé
 def memoriser(fonction):
     cache = {}
 
@@ -126,42 +128,32 @@ def memoriser(fonction):
 
     return enveloppe
 
-@chronometrer()
-def fibonacci_sans_memoire(n):
-    def fibonacci(n):
-        if n < 2:
-            return n
-        return fibonacci(n - 1) + fibonacci(n - 2)
+# Fonction récursive de l'énoncé
+def fibonacci(n):
+    if n < 2:
+        return n
+    return fibonacci(n - 1) + fibonacci(n - 2)
 
-    return fibonacci(n)
+# Même fonction, avec @memoriser puis avec @lru_cache
+@memoriser
+def fibonacci_memo(n):
+    if n < 2:
+        return n
+    return fibonacci_memo(n - 1) + fibonacci_memo(n - 2)
 
-print("Sans mémorisation :", fibonacci_sans_memoire(30))
+@lru_cache(maxsize=None)
+def fibonacci_lru(n):
+    if n < 2:
+        return n
+    return fibonacci_lru(n - 1) + fibonacci_lru(n - 2)
 
-@chronometrer()
-def fibonacci_avec_memoire(n):
-    @memoriser
-    def fibonacci(n):
-        if n < 2:
-            return n
-        return fibonacci(n - 1) + fibonacci(n - 2)
+# On chronomètre l'appel de fibonacci(30), pas chaque appel récursif :
+# décorer la fonction elle-même afficherait un temps à chaque appel récursif.
+print("Sans mémorisation :", chronometrer(unite="ms")(fibonacci)(30))
+print("Avec @memoriser :", chronometrer(unite="ms")(fibonacci_memo)(30))
+print("Avec @lru_cache :", chronometrer(unite="ms")(fibonacci_lru)(30))
 
-    return fibonacci(n)
-
-print("Avec @memoriser :", fibonacci_avec_memoire(30))
-
-@chronometrer()
-def fibonacci_avec_lru_cache(n):
-    @lru_cache
-    def fibonacci(n):
-        if n < 2:
-            return n
-        return fibonacci(n - 1) + fibonacci(n - 2)
-
-    return fibonacci(n)
-
-print("Avec @lru_cache :", fibonacci_avec_lru_cache(30))
-
-# 7. Empilement de décorateurs
+# 7. Empilement de @chronometrer et @compter_appels, dans les deux ordres
 @chronometrer()
 @compter_appels
 def fonction_a():
@@ -181,23 +173,35 @@ print(fonction_b())
 print("Appels de fonction_b :", fonction_b.appels)
 
 # Les décorateurs s'appliquent de bas en haut.
-# L'ordre change donc quelle enveloppe se trouve autour de l'autre.
+# fonction_a = chronometrer()(compter_appels(f)) : le compteur est dans l'enveloppe
+# intérieure. @wraps a copié appels (valeur 0) sur l'enveloppe extérieure, qui est
+# la seule visible : fonction_a.appels reste donc à 0.
+# fonction_b = compter_appels(chronometrer()(f)) : l'enveloppe extérieure est celle
+# du compteur, donc fonction_b.appels vaut bien 2. La durée est mesurée dans les deux cas.
 
-# 8. MiniFlask
+# 8. MiniFlask : doublons refusés, lister_routes et erreur 404 personnalisée
 class MiniFlask:
     def __init__(self):
         self.routes = {}
         self.fonction_404 = None
 
     def route(self, chemin):
-        def enregistrer(fonction):
-            if chemin in self.routes:
-                raise ValueError("Cette URL est déjà enregistrée.")
+        if chemin in self.routes:
+            raise ValueError("Cette URL est déjà enregistrée : " + chemin)
 
+        def enregistrer(fonction):
             self.routes[chemin] = fonction
             return fonction
 
         return enregistrer
+
+    def erreur_404(self, fonction):
+        self.fonction_404 = fonction
+        return fonction
+
+    def lister_routes(self):
+        for chemin in self.routes:
+            print(chemin)
 
     def traiter(self, chemin):
         fonction = self.routes.get(chemin)
@@ -209,14 +213,6 @@ class MiniFlask:
             return self.fonction_404()
 
         return "404 : page introuvable"
-
-    def lister_routes(self):
-        for chemin in self.routes:
-            print(chemin)
-
-    def erreur_404(self, fonction):
-        self.fonction_404 = fonction
-        return fonction
 
 app = MiniFlask()
 
@@ -230,7 +226,14 @@ def contact():
 
 @app.erreur_404
 def page_introuvable():
-    return "404 : page introuvable"
+    return "404 : page introuvable (personnalisée)"
+
+try:
+    @app.route("/")
+    def autre_accueil():
+        return "Doublon"
+except ValueError as erreur:
+    print(erreur)
 
 print(app.traiter("/"))
 print(app.traiter("/contact"))
